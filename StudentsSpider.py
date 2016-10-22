@@ -15,17 +15,36 @@ HEAD = {'User-Agent':'Mozilla/5.0 (Windows NT 5.1; rv:17.0) Gecko/20100101 Firef
 IMG_URL = "http://bksjw.chd.edu.cn/xjInfoAction.do?oper=img" #头像的URL
 USER_INFO_URL = "http://bksjw.chd.edu.cn/xjInfoAction.do?oper=xjxx"
 GRADE = "http://bksjw.chd.edu.cn/bxqcjcxAction.do"
+"""
+proxies_dict = {}
+proxy_url = "http://api.xicidaili.com/free2016.txt"
+r = requests.get(proxy_url)
+proxies = (r.text).split()
+app = "http://"
+for proxy in proxies:
+    app += proxy
+proxies_dict['http'] = proxies
+proxy_ = {"http": "http://120.76.243.40"}
+"""
+class NotValidIdException(Exception):
+    pass
 
 def login(username):
+    if len(username) != 12:
+        raise NotValidIdException
     result = []
     session = requests.Session()
-    base_page = session.get(BASE_URP_URL, headers=HEAD)
+    base_page = session.get(BASE_URP_URL, headers=HEAD)#, proxies=proxy_)
+    """
     if base_page.status_code == 200:
         print("Connection OK! ")
+    """
     data = {'zjh':username,'mm':username,'dllx':'dldl'}
     index = session.post(LOGIN_URL,data=data, headers=HEAD)
+    """
     if index.status_code == 200:
         print("Login success. ")
+    """
     image = session.get(IMG_URL)
     img_content = image.content
     user_info_index = session.get(USER_INFO_URL,headers=HEAD)
@@ -90,38 +109,60 @@ def parse(soup):
         print("用户不存在!")
         return 0
     return user_info
+
+def gen_id():
+    """This is for 2011-2015
+    ***Which is 12 bit
+    """
+    #Before 2011 is 10 bit
+    with open("stu_num.txt", "r") as fh:
+        for line in fh:
+            after = ""
+            after = line.replace("2013", "2011")
+            after = after.replace("\n", "")
+            yield after
+
 def main():
-    result = login("201324020240")
-    img = result[1]
-    print(type(img))
-    user_info = parse(result[0])
-    os.chdir("e:")
-    if img is not None:
-        with open("Students/" + user_info['姓名'] + ".png", 'wb') as fh:
-            fh.write(img)
-    """
-    print(parse(login("201324020211"))['学号'])
-    print(len(parse(login("201324020211"))))
-    """
-    """
-    user_info = parse(login("201324020211"))
+    ids = gen_id()
     conn = pymysql.connect(host="127.0.0.1", port=3306, user="leo", password="mm123456", db="chd", charset='utf8mb4',cursorclass=pymysql.cursors.DictCursor )
     cur = conn.cursor()
-    keys = ""
-    values = ""
-    for key, value in user_info.items():
-        key += ", "
-        keys += key
-        value = "\'" + value
-        value += "\'"
-        value += ", "
-        values += value
-    cur.execute('INSERT INTO students ({0}) VALUES ({1})'.format(keys.rstrip(", "), values.rstrip(", ")))
-    cur.connection.commit()
+    while True:
+        origin = ids.__next__()
+        try:
+            result = login(origin)
+        except (TypeError, NotValidIdException):
+            print(origin, type(origin), len(origin))
+            return
+        img = result[1]
+        user_info = parse(result[0])
+        if user_info == 0:
+            continue
+        else:
+            print(user_info['姓名'], "已被找到")
+        os.chdir("e:")
+        """
+        if len(img) == 0:
+            print(user_info['姓名'], "无头像")
+        """
+        if img is not None and len(img) != 0:
+            with open("Students/" + user_info['姓名'] + user_info['学号'] + ".png", 'wb') as fh:
+                fh.write(img)
+        keys = ""
+        values = ""
+        for key, value in user_info.items():
+            key += ", "
+            keys += key
+            value = "\'" + value
+            value += "\'"
+            value += ", "
+            values += value
+        try:
+            cur.execute('INSERT INTO students ({0}) VALUES ({1})'.format(keys.rstrip(", "), values.rstrip(", ")))
+        except pymysql.err.IntegrityError as err:
+            print("已存在")
+        cur.connection.commit()
     cur.close()
     conn.close()
-    """
-
 
 if __name__ == "__main__":
     main()

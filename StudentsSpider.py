@@ -30,8 +30,6 @@ class NotValidIdException(Exception):
     pass
 
 def login(username):
-    if len(username) != 12:
-        raise NotValidIdException
     result = []
     session = requests.Session()
     base_page = session.get(BASE_URP_URL, headers=HEAD)#, proxies=proxy_)
@@ -115,10 +113,10 @@ def gen_id():
     ***Which is 12 bit
     """
     #Before 2011 is 10 bit
-    with open("stu_num.txt", "r") as fh:
+    with open("2009.txt", "r") as fh:
         for line in fh:
             after = ""
-            after = line.replace("2013", "2011")
+            after = line.replace("090", "100")
             after = after.replace("\n", "")
             yield after
 
@@ -130,7 +128,7 @@ def main():
         origin = ids.__next__()
         try:
             result = login(origin)
-        except (TypeError, NotValidIdException):
+        except TypeError:#, NotValidIdException):
             print(origin, type(origin), len(origin))
             return
         img = result[1]
@@ -160,6 +158,8 @@ def main():
             cur.execute('INSERT INTO students ({0}) VALUES ({1})'.format(keys.rstrip(", "), values.rstrip(", ")))
         except pymysql.err.IntegrityError as err:
             print("已存在")
+        except pymysql.err.DataError as err:
+            print(err)
         cur.connection.commit()
     cur.close()
     conn.close()
